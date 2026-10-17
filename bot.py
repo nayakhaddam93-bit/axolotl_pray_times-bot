@@ -2,6 +2,7 @@
 import os, io, math, asyncio, sqlite3
 from datetime import datetime
 import requests
+import matplotlib
 from PIL import Image, ImageDraw, ImageFont, features
 import arabic_reshaper
 from bidi.algorithm import get_display
@@ -14,9 +15,10 @@ DB_PATH = "bot_stats.db"
 LOGO_PATH = "logo.jpg"
 
 CAIRO_FONTS = ["Cairo-Bold.ttf", "Cairo-Regular.ttf"]
+_MPL = os.path.join(matplotlib.get_data_path(), "fonts", "ttf")
 DEJAVU_FONTS = [
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    os.path.join(_MPL, "DejaVuSans-Bold.ttf"),
+    os.path.join(_MPL, "DejaVuSans.ttf"),
 ]
 
 SYRIA_GOVERNORATES = {
@@ -96,6 +98,7 @@ DOODLE = (110, 175, 150, 70)
 
 USE_RAQM = features.check("raqm")
 print("RAQM:", USE_RAQM)
+print("Fonts:", [p for p in DEJAVU_FONTS if os.path.exists(p)])
 
 def s(v): return int(v * S)
 

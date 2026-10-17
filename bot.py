@@ -80,25 +80,25 @@ def render_prayer_card_bytes(gov_ar, greg_date, hijri_date, timings):
     img = Image.new('RGB', (800, 1200), color='#D2F3EC')
     draw = ImageDraw.Draw(img)
     try:
-        f_title = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoKufiArabic-Bold.ttf", 36)
-        f_text = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoKufiArabic-Bold.ttf", 26)
+        f_title = ImageFont.load_default()
+        f_text = ImageFont.load_default()
     except:
-        f_title = f_text = ImageFont.load_default()
+        f_title = f_text = None
 
-    draw.text((400, 100), "مواقيت الصلاة في سوريا", fill="#12383B", font=f_title, anchor="mm", direction="rtl")
-    draw.text((400, 180), f"محافظة {gov_ar}", fill="#0A3622", font=f_title, anchor="mm", direction="rtl")
-    draw.text((400, 240), f"{greg_date}  |  {hijri_date}", fill="#12383B", font=f_text, anchor="mm", direction="rtl")
+    draw.text((400, 100), "مواقيت الصلاة في سوريا", fill="#12383B", anchor="mm")
+    draw.text((400, 180), f"محافظة {gov_ar}", fill="#0A3622", anchor="mm")
+    draw.text((400, 240), f"{greg_date} | {hijri_date}", fill="#12383B", anchor="mm")
 
     p_list = [("الفجر", timings["Fajr"]), ("الشروق", timings["Sunrise"]), ("الظهر", timings["Dhuhr"]), ("العصر", timings["Asr"]), ("المغرب", timings["Maghrib"]), ("العشاء", timings["Isha"])]
     y = 320
     for name, time in p_list:
         draw.rectangle([100, y, 700, y+80], fill="#1B5E55", outline="#12383B", width=3)
-        draw.text((150, y+40), time, fill="#D2F3EC", font=f_text, anchor="lm")
-        draw.text((650, y+40), f"صلاة {name}" if name != "الشروق" else name, fill="#FFFFFF", font=f_text, anchor="rm", direction="rtl")
+        draw.text((150, y+40), time, fill="#D2F3EC", anchor="lm")
+        draw.text((650, y+40), f"صلاة {name}", fill="#FFFFFF", anchor="rm")
         y += 100
 
-    draw.text((400, 1050), "نسأل الله التوفيق", fill="#0A3622", font=f_text, anchor="mm", direction="rtl")
-    draw.text((700, 1140), "Naya khaddam", fill="#12383B", font=f_text, anchor="rm")
+    draw.text((400, 1050), "نسأل الله التوفيق", fill="#0A3622", anchor="mm")
+    draw.text((700, 1140), "Naya khaddam", fill="#12383B", anchor="rm")
 
     bio = io.BytesIO()
     img.save(bio, format="PNG")

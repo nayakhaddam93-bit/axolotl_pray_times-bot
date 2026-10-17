@@ -76,20 +76,33 @@ def fetch_prayer_times(gov_key):
     hijri_date = f"{h['day']} {h['month']['ar']} {h['year']} هـ"
     return gov_ar, greg_date, hijri_date, timings
 
-def render_prayer_card_bytes(gov_ar, greg_date, hijri_date, timings):
-    img = Image.new('RGB', (800, 1200), color='#D2F3EC')
-    draw = ImageDraw.Draw(img)
+def get_font(size):
     try:
-        font_title = ImageFont.truetype("DejaVuSans-Bold.ttf", 36)
-        font_text = ImageFont.truetype("DejaVuSans.ttf", 28)
+        font_path = "Cairo-Regular.ttf"
+        if not os.path.exists(font_path):
+            url = "https://github.com/google/fonts/raw/main/ofl/cairo/Cairo-Regular.ttf"
+            r = requests.get(url, timeout=10)
+            with open(font_path, "wb") as f:
+                f.write(r.content)
+        return ImageFont.truetype(font_path, size)
     except:
-        font_title = ImageFont.load_default()
-        font_text = ImageFont.load_default()
+        return ImageFont.load_default()
 
-    draw.rectangle([0, 0, 800, 150], fill="#1B5E55")
-    draw.text((400, 50), "مواقيت الصلاة في سوريا", fill="#FFFFFF", anchor="mm", font=font_title)
-    draw.text((400, 105), f"محافظة {gov_ar}", fill="#D2F3EC", anchor="mm", font=font_text)
-    draw.text((400, 185), f"{greg_date}  |  {hijri_date}", fill="#12383B", anchor="mm", font=font_text)
+def render_prayer_card_bytes(gov_ar, greg_date, hijri_date, timings):
+    img = Image.new('RGB', (900, 1300), color='#E8F5F1')
+    draw = ImageDraw.Draw(img)
+    
+    font_title = get_font(42)
+    font_sub = get_font(32)
+    font_text = get_font(30)
+    font_small = get_font(24)
+
+    # رأسية البطاقة بلون فخم
+    draw.rectangle([0, 0, 900, 180], fill="#114B40")
+    draw.text((450, 60), "🌸 مواقيت الصلاة في سوريا", fill="#FFFFFF", anchor="mm", font=font_title)
+    draw.text((450, 130), f"محافظة {gov_ar} 🐾 Axolotl Edition", fill="#A3E4D7", anchor="mm", font=font_sub)
+
+    draw.text((450, 220), f"{greg_date}  |  {hijri_date}", fill="#1B4F72", anchor="mm", font=font_sub)
 
     p_list = [
         ("الفجر", timings["Fajr"]), 
@@ -100,15 +113,15 @@ def render_prayer_card_bytes(gov_ar, greg_date, hijri_date, timings):
         ("العشاء", timings["Isha"])
     ]
     
-    y = 250
+    y = 290
     for name, time in p_list:
-        draw.rectangle([80, y, 720, y+85], fill="#1B5E55", outline="#12383B", width=2)
-        draw.text((150, y+42), time, fill="#D2F3EC", anchor="lm", font=font_text)
-        draw.text((650, y+42), f"صلاة {name}", fill="#FFFFFF", anchor="rm", font=font_text)
-        y += 105
+        draw.rectangle([80, y, 820, y+95], fill="#1B5E55", outline="#114B40", width=3)
+        draw.text((150, y+47), time, fill="#E8F5F1", anchor="lm", font=font_text)
+        draw.text((750, y+47), f"صلاة {name}", fill="#FFFFFF", anchor="rm", font=font_text)
+        y += 115
 
-    draw.text((400, 960), "نسأل الله التوفيق والقبول", fill="#0A3622", anchor="mm", font=font_text)
-    draw.text((400, 1120), "Axolotl Prayer Bot - Naya Khaddam", fill="#12383B", anchor="mm", font=font_text)
+    draw.text((450, 1040), "🌿 نسأل الله التوفيق والقبول", fill="#0E6655", anchor="mm", font=font_sub)
+    draw.text((450, 1220), "🐾 Designed for Naya Khaddam | Axolotl Bot 🌿", fill="#114B40", anchor="mm", font=font_small)
 
     bio = io.BytesIO()
     img.save(bio, format="PNG")
@@ -127,7 +140,7 @@ def build_keyboard():
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     register_interaction(update)
-    await update.message.reply_text("🌸 أهلاً بك في بوت مواقيت الصلاة\nاختر المحافظة:", reply_markup=build_keyboard())
+    await update.message.reply_text("🌸 أهلاً بك في بوت مواقيت الصلاة (إصدار Axolotl 🐾)\nاختر المحافظة:", reply_markup=build_keyboard())
 
 async def mention_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message and update.message.text and context.bot.username in update.message.text:
@@ -140,10 +153,10 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     register_interaction(update)
     data = query.data
     if data.startswith("gov:"):
-        gov_key = data.data.split(":")[1] if hasattr(data, 'data') else data.split(":")[1]
+        gov_key = data.split(":")[1]
         gov_ar, greg, hijri, timings = fetch_prayer_times(gov_key)
         card = render_prayer_card_bytes(gov_ar, greg, hijri, timings)
-        await query.message.reply_photo(photo=card, caption=f"🕌 مواقيت الصلاة في {gov_ar}\n🐾 Axolotl Prayer Bot", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔄 محافظات أخرى", callback_data="back")]]))
+        await query.message.reply_photo(photo=card, caption=f"🕌 مواقيت الصلاة في {gov_ar}\n🐾 Axolotl Prayer Bot | Naya khaddam", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔄 محافظات أخرى", callback_data="back")]]))
     elif data == "back":
         await query.message.reply_text("اختر المحافظة:", reply_markup=build_keyboard())
 

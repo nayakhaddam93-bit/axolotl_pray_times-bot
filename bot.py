@@ -232,12 +232,14 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     register_interaction(update)
     data = query.data
     if data.startswith("gov:"):
+        user = query.from_user
+        who = f"@{user.username}" if user.username else user.full_name
         gov_key = data.split(":")[1]
         gov_ar, greg, hijri, timings = await asyncio.to_thread(fetch_prayer_times, gov_key)
         card = await asyncio.to_thread(render_prayer_card_bytes, gov_ar, greg, hijri, timings)
         await query.message.reply_photo(
             photo=card,
-            caption=f"🕌 مواقيت الصلاة في {gov_ar}\n🐾 Axolotl Prayer Bot | Naya khaddam",
+            caption=f"🕌 مواقيت الصلاة في {gov_ar}\n👤 بطلب من: {who}\n🐾 Axolotl Prayer Bot | Naya khaddam",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔄 محافظات أخرى", callback_data="back")]]))
     elif data == "back":
         await query.message.reply_text("اختر المحافظة:", reply_markup=build_keyboard())

@@ -79,26 +79,40 @@ def fetch_prayer_times(gov_key):
 def render_prayer_card_bytes(gov_ar, greg_date, hijri_date, timings):
     img = Image.new('RGB', (800, 1200), color='#D2F3EC')
     draw = ImageDraw.Draw(img)
+    
+    # محاولة تحميل خط عربي إن وجد، أو استخدام الافتراضي مع ترتيب المظهر
     try:
-        f_title = ImageFont.load_default()
-        f_text = ImageFont.load_default()
+        font_title = ImageFont.truetype("DejaVuSans-Bold.ttf", 36)
+        font_text = ImageFont.truetype("DejaVuSans.ttf", 28)
     except:
-        f_title = f_text = None
+        font_title = ImageFont.load_default()
+        font_text = ImageFont.load_default()
 
-    draw.text((400, 100), "مواقيت الصلاة في سوريا", fill="#12383B", anchor="mm")
-    draw.text((400, 180), f"محافظة {gov_ar}", fill="#0A3622", anchor="mm")
-    draw.text((400, 240), f"{greg_date} | {hijri_date}", fill="#12383B", anchor="mm")
+    # تصميم رأسية البطاقة مع لمسة Axolotl
+    draw.rectangle([0, 0, 800, 150], fill="#1B5E55")
+    draw.text((400, 50), "🌸 مواقيت الصلاة في سوريا - Axolotl Bot", fill="#FFFFFF", anchor="mm", font=font_title)
+    draw.text((400, 105), f"محافظة {gov_ar}", fill="#D2F3EC", anchor="mm", font=font_text)
 
-    p_list = [("الفجر", timings["Fajr"]), ("الشروق", timings["Sunrise"]), ("الظهر", timings["Dhuhr"]), ("العصر", timings["Asr"]), ("المغرب", timings["Maghrib"]), ("العشاء", timings["Isha"])]
-    y = 320
+    draw.text((400, 185), f"{greg_date}  |  {hijri_date}", fill="#12383B", anchor="mm", font=font_text)
+
+    p_list = [
+        ("الفجر", timings["Fajr"]), 
+        ("الشروق", timings["Sunrise"]), 
+        ("الظهر", timings["Dhuhr"]), 
+        ("العصر", timings["Asr"]), 
+        ("المغرب", timings["Maghrib"]), 
+        ("العشاء", timings["Isha"])
+    ]
+    
+    y = 250
     for name, time in p_list:
-        draw.rectangle([100, y, 700, y+80], fill="#1B5E55", outline="#12383B", width=3)
-        draw.text((150, y+40), time, fill="#D2F3EC", anchor="lm")
-        draw.text((650, y+40), f"صلاة {name}", fill="#FFFFFF", anchor="rm")
-        y += 100
+        draw.rectangle([80, y, 720, y+85], fill="#1B5E55", outline="#12383B", width=2)
+        draw.text((150, y+42), time, fill="#D2F3EC", anchor="lm", font=font_text)
+        draw.text((650, y+42), f"صلاة {name}", fill="#FFFFFF", anchor="rm", font=font_text)
+        y += 105
 
-    draw.text((400, 1050), "نسأل الله التوفيق", fill="#0A3622", anchor="mm")
-    draw.text((700, 1140), "Naya khaddam", fill="#12383B", anchor="rm")
+    draw.text((400, 960), "🌿 نسأل الله التوفيق والقبول", fill="#0A3622", anchor="mm", font=font_text)
+    draw.text((400, 1120), "Designed by Naya Khaddam 🐾 Axolotl Edition", fill="#12383B", anchor="mm", font=font_text)
 
     bio = io.BytesIO()
     img.save(bio, format="PNG")
@@ -117,7 +131,7 @@ def build_keyboard():
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     register_interaction(update)
-    await update.message.reply_text("🌿 أهلاً بك في بوت مواقيت الصلاة في سوريا\nاختر المحافظة:", reply_markup=build_keyboard())
+    await update.message.reply_text("🌸 أهلاً بك في بوت مواقيت الصلاة (إصدار Axolotl 🐾)\nاختر المحافظة:", reply_markup=build_keyboard())
 
 async def mention_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message and update.message.text and context.bot.username in update.message.text:
@@ -133,7 +147,7 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         gov_key = data.split(":")[1]
         gov_ar, greg, hijri, timings = fetch_prayer_times(gov_key)
         card = render_prayer_card_bytes(gov_ar, greg, hijri, timings)
-        await query.message.reply_photo(photo=card, caption=f"🕌 مواقيت الصلاة في {gov_ar}\n🌿 نسأل الله التوفيق | Naya khaddam", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔄 محافظات أخرى", callback_data="back")]]))
+        await query.message.reply_photo(photo=card, caption=f"🕌 مواقيت الصلاة في {gov_ar}\n🐾 Axolotl Prayer Bot | Naya khaddam", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔄 محافظات أخرى", callback_data="back")]]))
     elif data == "back":
         await query.message.reply_text("اختر المحافظة:", reply_markup=build_keyboard())
 
@@ -154,5 +168,6 @@ def main():
     print("Bot is running...")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
-if __name__ == "__main__":
-    main()
+if __name__ == "main":
+    main()غ
+    

@@ -2,7 +2,7 @@
 import os, io, math, asyncio, sqlite3
 from datetime import datetime
 import requests
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, features
 import arabic_reshaper
 from bidi.algorithm import get_display
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -12,8 +12,9 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "5195140085"))
 DB_PATH = "bot_stats.db"
 LOGO_PATH = "logo.jpg"
-FONT_CANDIDATES = [
-    "Cairo-Bold.ttf", "Cairo-Regular.ttf",
+
+CAIRO_FONTS = ["Cairo-Bold.ttf", "Cairo-Regular.ttf"]
+DEJAVU_FONTS = [
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
 ]
@@ -93,16 +94,36 @@ MINT_DARK = "#8FC4B3"
 CORAL = "#E0707A"
 DOODLE = (110, 175, 150, 70)
 
+USE_RAQM = features.check("raqm")
+print("RAQM:", USE_RAQM)
+
 def s(v): return int(v * S)
 
+class RTLDraw(ImageDraw.ImageDraw):
+    """رسم نص عربي: إذا RAQM متوفر بيشكّل الحروف لحاله"""
+    def text(self, xy, text, *args, **kwargs):
+        if USE_RAQM:
+            kwargs.setdefault("direction", "rtl")
+            kwargs.setdefault("language", "ar")
+        return super().text(xy, text, *args, **kwargs)
+
 def ar(text):
+    if USE_RAQM:
+        return text
     return get_display(arabic_reshaper.reshape(text))
 
 def get_font(size):
-    for path in FONT_CANDIDATES:
+    # مع RAQM نستخدم Cairo، بدونه نستخدم DejaVu لأنه فيه كل أشكال الحروف
+    if USE_RAQM:
+        paths = CAIRO_FONTS + DEJAVU_FONTS
+        engine = ImageFont.Layout.RAQM
+    else:
+        paths = DEJAVU_FONTS + CAIRO_FONTS
+        engine = ImageFont.Layout.BASIC
+    for path in paths:
         if os.path.exists(path):
             try:
-                return ImageFont.truetype(path, s(size), layout_engine=ImageFont.Layout.BASIC)
+                return ImageFont.truetype(path, s(size), layout_engine=engine)
             except Exception:
                 continue
     return ImageFont.load_default()
@@ -155,7 +176,7 @@ def render_prayer_card_bytes(gov_ar, greg_date, hijri_date, timings):
         logo, mask = circular_logo(D)
         img.paste(logo, ((s(W) - D) // 2, s(30)), mask)
 
-    draw = ImageDraw.Draw(img)
+    draw = RTLDraw(img)
     f_title, f_sub, f_text, f_small = get_font(60), get_font(36), get_font(38), get_font(28)
 
     draw.text((s(450), s(305)), ar("مواقيت الصلاة"), fill=DARK, anchor="mm", font=f_title)

@@ -113,10 +113,12 @@ class RTLDraw(ImageDraw.ImageDraw):
 def ar(text):
     if USE_RAQM:
         return text
-    return get_display(arabic_reshaper.reshape(text))
+    shaped = arabic_reshaper.reshape(text)
+    # رمز "ﷲ" الخاص غير موجود بالخط، فنفكه لحروفه العادية: ا ل ل ه
+    shaped = shaped.replace("\uFDF2", "\uFE8D\uFEDF\uFEE0\uFEEA")
+    return get_display(shaped)
 
 def get_font(size):
-    # مع RAQM نستخدم Cairo، بدونه نستخدم DejaVu لأنه فيه كل أشكال الحروف
     if USE_RAQM:
         paths = CAIRO_FONTS + DEJAVU_FONTS
         engine = ImageFont.Layout.RAQM

@@ -79,8 +79,6 @@ def fetch_prayer_times(gov_key):
 def render_prayer_card_bytes(gov_ar, greg_date, hijri_date, timings):
     img = Image.new('RGB', (800, 1200), color='#D2F3EC')
     draw = ImageDraw.Draw(img)
-    
-    # محاولة تحميل خط عربي إن وجد، أو استخدام الافتراضي مع ترتيب المظهر
     try:
         font_title = ImageFont.truetype("DejaVuSans-Bold.ttf", 36)
         font_text = ImageFont.truetype("DejaVuSans.ttf", 28)
@@ -88,11 +86,9 @@ def render_prayer_card_bytes(gov_ar, greg_date, hijri_date, timings):
         font_title = ImageFont.load_default()
         font_text = ImageFont.load_default()
 
-    # تصميم رأسية البطاقة مع لمسة Axolotl
     draw.rectangle([0, 0, 800, 150], fill="#1B5E55")
-    draw.text((400, 50), "🌸 مواقيت الصلاة في سوريا - Axolotl Bot", fill="#FFFFFF", anchor="mm", font=font_title)
+    draw.text((400, 50), "مواقيت الصلاة في سوريا - Axolotl Bot", fill="#FFFFFF", anchor="mm", font=font_title)
     draw.text((400, 105), f"محافظة {gov_ar}", fill="#D2F3EC", anchor="mm", font=font_text)
-
     draw.text((400, 185), f"{greg_date}  |  {hijri_date}", fill="#12383B", anchor="mm", font=font_text)
 
     p_list = [
@@ -111,8 +107,8 @@ def render_prayer_card_bytes(gov_ar, greg_date, hijri_date, timings):
         draw.text((650, y+42), f"صلاة {name}", fill="#FFFFFF", anchor="rm", font=font_text)
         y += 105
 
-    draw.text((400, 960), "🌿 نسأل الله التوفيق والقبول", fill="#0A3622", anchor="mm", font=font_text)
-    draw.text((400, 1120), "Designed by Naya Khaddam 🐾 Axolotl Edition", fill="#12383B", anchor="mm", font=font_text)
+    draw.text((400, 960), "نسأل الله التوفيق والقبول", fill="#0A3622", anchor="mm", font=font_text)
+    draw.text((400, 1120), "Designed by Naya Khaddam - Axolotl Edition", fill="#12383B", anchor="mm", font=font_text)
 
     bio = io.BytesIO()
     img.save(bio, format="PNG")
@@ -125,18 +121,18 @@ def build_keyboard():
     for i in range(0, len(items), 2):
         row = []
         for key, (name_ar, _, _) in items[i:i+2]:
-            row.append(InlineKeyboardButton(f"📍 {name_ar}", callback_data=f"gov:{key}"))
+            row.append(InlineKeyboardButton(f"{name_ar}", callback_data=f"gov:{key}"))
         buttons.append(row)
     return InlineKeyboardMarkup(buttons)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     register_interaction(update)
-    await update.message.reply_text("🌸 أهلاً بك في بوت مواقيت الصلاة (إصدار Axolotl 🐾)\nاختر المحافظة:", reply_markup=build_keyboard())
+    await update.message.reply_text("أهلاً بك في بوت مواقيت الصلاة (إصدار Axolotl)\nاختر المحافظة:", reply_markup=build_keyboard())
 
 async def mention_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message and update.message.text and context.bot.username in update.message.text:
         register_interaction(update)
-        await update.message.reply_text("🕌 مواقيت الصلاة في سوريا - اختر المحافظة:", reply_markup=build_keyboard())
+        await update.message.reply_text("مواقيت الصلاة في سوريا - اختر المحافظة:", reply_markup=build_keyboard())
 
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -147,16 +143,16 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         gov_key = data.split(":")[1]
         gov_ar, greg, hijri, timings = fetch_prayer_times(gov_key)
         card = render_prayer_card_bytes(gov_ar, greg, hijri, timings)
-        await query.message.reply_photo(photo=card, caption=f"🕌 مواقيت الصلاة في {gov_ar}\n🐾 Axolotl Prayer Bot | Naya khaddam", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔄 محافظات أخرى", callback_data="back")]]))
+        await query.message.reply_photo(photo=card, caption=f"مواقيت الصلاة في {gov_ar}\nAxolotl Prayer Bot | Naya khaddam", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("محافظات أخرى", callback_data="back")]]))
     elif data == "back":
         await query.message.reply_text("اختر المحافظة:", reply_markup=build_keyboard())
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
-        await update.message.reply_text("🔒 للأدمن فقط.")
+        await update.message.reply_text("ل للأدمن فقط.")
         return
     u, ch = get_bot_stats()
-    await update.message.reply_text(f"📊 إحصائيات البوت:\n👤 المستخدمين: {u}\n👥 المجموعات: {ch}")
+    await update.message.reply_text(f"إحصائيات البوت:\nالمستخدمين: {u}\nالمجموعات: {ch}")
 
 def main():
     init_db()
@@ -168,6 +164,5 @@ def main():
     print("Bot is running...")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
-if __name__ == "main":
-    main()غ
-    
+if __name__ == "__main__":
+    main()

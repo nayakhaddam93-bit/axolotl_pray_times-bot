@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import os, io, math, asyncio, sqlite3
+import os, io, math, asyncio, sqlite3, re
 from datetime import datetime
 import requests
 import matplotlib
@@ -21,6 +21,7 @@ DEJAVU_FONTS = [
     os.path.join(_MPL, "DejaVuSans.ttf"),
 ]
 
+# حافظنا على خطوط الطول والعرض مشان ما تخرب أزرار البوت تحت
 SYRIA_GOVERNORATES = {
     "Damascus": ("دمشق", 33.5138, 36.2765),
     "Rif_Dimashq": ("ريف دمشق", 33.5167, 36.4000),
@@ -76,16 +77,46 @@ def format_12h(t24):
 
 def fetch_prayer_times(gov_key):
     gov_ar, lat, lon = SYRIA_GOVERNORATES[gov_key]
-    resp = requests.get("https://api.aladhan.com/v1/timings",
-                        params={"latitude": lat, "longitude": lon, "method": 4, "timezonestring": "Asia/Damascus"},
-                        timeout=10)
-    data = resp.json()["data"]
-    timings = {k: format_12h(v) for k, v in data["timings"].items()}
-    en_day = data["date"]["gregorian"]["weekday"]["en"]
-    greg_date = f"{ARABIC_DAYS.get(en_day, '')} {data['date']['gregorian']['date']} م"
-    h = data["date"]["hijri"]
-    hijri_date = f"{h['day']} {h['month']['ar']} {h['year']} هـ"
-    return gov_ar, greg_date, hijri_date, timings
+    
+    # 1. جلب التاريخ الهجري والميلادي فقط من الـ API لضمان دقة التقويم
+    try:
+        resp = requests.get("https://api.aladhan.com/v1/timings",
+                            params={"latitude": lat, "longitude": lon, "method": 4, "timezonestring": "Asia/Damascus"},
+                            timeout=10)
+        data = resp.json()["data"]
+        en_day = data["date"]["gregorian"]["weekday"]["en"]
+        greg_date = f"{ARABIC_DAYS.get(en_day, '')} {data['date']['gregorian']['date']} م"
+        h = data["date"]["hijri"]
+        hijri_date = f"{h['day']} {h['month']['ar']} {h['year']} هـ"
+    except Exception:
+        greg_date, hijri_date = "تاريخ غير متاح", ""
+
+    # 2. جلب الأوقات الدقيقة جداً (حسب الرزنامة الهاشمية) من الموقع السوري
+    url_city = gov_key
+    if gov_key == "Rif_Dimashq": url_city = "Damascus"
+    elif gov_key == "Deir_ez_Zor": url_city = "Deir-ez-Zor"
+    elif gov_key == "Al_Hasakah": url_city = "Al-Hasakah"
+    elif gov_key == "As_Suwayda": url_city = "As-Suwayda"
+    
+    url = f"https://athantimes.com/Syria/{url_city}"
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    
+    prayers = [("الفجر", "Fajr"), ("الشروق", "Sunrise"), ("الظهر", "Dhuhr"), 
+               ("العصر", "Asr"), ("المغرب", "Maghrib"), ("العشاء", "Isha")]
+    times = {k: "00:00" for _, k in prayers}
+    
+    try:
+        html = requests.get(url, headers=headers, timeout=10).text
+        for name_ar, key_en in prayers:
+            match = re.search(f'وقت صلاة {name_ar}.*?<td>(\d{{2}}:\d{{2}})</td>', html, re.DOTALL)
+            if not match and name_ar == "الشروق":
+                match = re.search(r'وقت الشروق.*?<td>(\d{{2}}:\d{{2}})</td>', html, re.DOTALL)
+            if match:
+                times[key_en] = format_12h(match.group(1))
+    except Exception as e:
+        print(f"Error fetching exact times: {e}")
+        
+    return gov_ar, greg_date, hijri_date, times
 
 # ---------- Image rendering ----------
 S = 2
@@ -97,13 +128,10 @@ CORAL = "#E0707A"
 DOODLE = (110, 175, 150, 70)
 
 USE_RAQM = features.check("raqm")
-print("RAQM:", USE_RAQM)
-print("Fonts:", [p for p in DEJAVU_FONTS if os.path.exists(p)])
 
 def s(v): return int(v * S)
 
 class RTLDraw(ImageDraw.ImageDraw):
-    """رسم نص عربي: إذا RAQM متوفر بيشكّل الحروف لحاله"""
     def text(self, xy, text, *args, **kwargs):
         if USE_RAQM:
             kwargs.setdefault("direction", "rtl")
@@ -114,7 +142,6 @@ def ar(text):
     if USE_RAQM:
         return text
     shaped = arabic_reshaper.reshape(text)
-    # رمز "ﷲ" الخاص غير موجود بالخط، فنفكه لحروفه العادية: ا ل ل ه
     shaped = shaped.replace("\uFDF2", "\uFE8D\uFEDF\uFEE0\uFEEA")
     return get_display(shaped)
 

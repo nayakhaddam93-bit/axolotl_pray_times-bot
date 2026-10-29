@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import os, io, math, asyncio, sqlite3, re
+import os, io, math, asyncio, sqlite3
 from datetime import datetime
 import requests
 import matplotlib
@@ -9,7 +9,7 @@ from bidi.algorithm import get_display
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 ADMIN_ID = int(os.getenv("ADMIN_ID", "5195140085"))
 DB_PATH = "bot_stats.db"
 LOGO_PATH = "logo.jpg"
@@ -21,7 +21,6 @@ DEJAVU_FONTS = [
     os.path.join(_MPL, "DejaVuSans.ttf"),
 ]
 
-# حافظنا على خطوط الطول والعرض مشان ما تخرب أزرار البوت تحت
 SYRIA_GOVERNORATES = {
     "Damascus": ("دمشق", 33.5138, 36.2765),
     "Rif_Dimashq": ("ريف دمشق", 33.5167, 36.4000),
@@ -39,16 +38,18 @@ SYRIA_GOVERNORATES = {
     "Quneitra": ("القنيطرة", 33.1259, 35.8246),
 }
 
-ARABIC_DAYS = {"Saturday": "السبت", "Sunday": "الأحد", "Monday": "الإثنين", "Tuesday": "الثلاثاء",
-               "Wednesday": "الأربعاء", "Thursday": "الخميس", "Friday": "الجمعة"}
+ARABIC_DAYS = {
+    "Saturday": "السبت", "Sunday": "الأحد", "Monday": "الإثنين",
+    "Tuesday": "الثلاثاء", "Wednesday": "الأربعاء", "Thursday": "الخميس", "Friday": "الجمعة"
+}
 
-# ---------- DB ----------
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, username TEXT, full_name TEXT, joined_at TEXT)")
     c.execute("CREATE TABLE IF NOT EXISTS chats (chat_id INTEGER PRIMARY KEY, chat_title TEXT, chat_type TEXT, joined_at TEXT)")
-    conn.commit(); conn.close()
+    conn.commit()
+    conn.close()
 
 def register_interaction(update: Update):
     conn = sqlite3.connect(DB_PATH)
@@ -60,65 +61,45 @@ def register_interaction(update: Update):
     chat = update.effective_chat
     if chat and chat.type in ("group", "supergroup"):
         c.execute("INSERT OR IGNORE INTO chats VALUES (?, ?, ?, ?)", (chat.id, chat.title or "", chat.type, now_str))
-    conn.commit(); conn.close()
+    conn.commit()
+    conn.close()
 
 def get_bot_stats():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("SELECT COUNT(*) FROM users"); u = c.fetchone()[0]
-    c.execute("SELECT COUNT(*) FROM chats"); ch = c.fetchone()[0]
+    c.execute("SELECT COUNT(*) FROM users")
+    u = c.fetchone()[0]
+    c.execute("SELECT COUNT(*) FROM chats")
+    ch = c.fetchone()[0]
     conn.close()
     return u, ch
 
-# ---------- Prayer times ----------
 def format_12h(t24):
     clean = t24.split(" ")[0].strip()
     return datetime.strptime(clean, "%H:%M").strftime("%I:%M %p").replace("AM", "ص").replace("PM", "م")
 
 def fetch_prayer_times(gov_key):
     gov_ar, lat, lon = SYRIA_GOVERNORATES[gov_key]
-    
-    # 1. جلب التاريخ الهجري والميلادي فقط من الـ API لضمان دقة التقويم
-    try:
-        resp = requests.get("https://api.aladhan.com/v1/timings",
-                            params={"latitude": lat, "longitude": lon, "method": 4, "timezonestring": "Asia/Damascus"},
-                            timeout=10)
-        data = resp.json()["data"]
-        en_day = data["date"]["gregorian"]["weekday"]["en"]
-        greg_date = f"{ARABIC_DAYS.get(en_day, '')} {data['date']['gregorian']['date']} م"
-        h = data["date"]["hijri"]
-        hijri_date = f"{h['day']} {h['month']['ar']} {h['year']} هـ"
-    except Exception:
-        greg_date, hijri_date = "تاريخ غير متاح", ""
+    resp = requests.get(
+        "https://api.aladhan.com/v1/timings",
+        params={
+            "latitude": lat,
+            "longitude": lon,
+            "method": 3,
+            "shafaq": "general",
+            "tune": "0,0,-2,2,0,3,0,2,0",
+            "timezonestring": "Asia/Damascus"
+        },
+        timeout=10
+    )
+    data = resp.json()["data"]
+    timings = {k: format_12h(v) for k, v in data["timings"].items()}
+    en_day = data["date"]["gregorian"]["weekday"]["en"]
+    greg_date = f"{ARABIC_DAYS.get(en_day, '')} {data['date']['gregorian']['date']} م"
+    h = data["date"]["hijri"]
+    hijri_date = f"{h['day']} {h['month']['ar']} {h['year']} هـ"
+    return gov_ar, greg_date, hijri_date, timings
 
-    # 2. جلب الأوقات الدقيقة جداً (حسب الرزنامة الهاشمية) من الموقع السوري
-    url_city = gov_key
-    if gov_key == "Rif_Dimashq": url_city = "Damascus"
-    elif gov_key == "Deir_ez_Zor": url_city = "Deir-ez-Zor"
-    elif gov_key == "Al_Hasakah": url_city = "Al-Hasakah"
-    elif gov_key == "As_Suwayda": url_city = "As-Suwayda"
-    
-    url = f"https://athantimes.com/Syria/{url_city}"
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-    
-    prayers = [("الفجر", "Fajr"), ("الشروق", "Sunrise"), ("الظهر", "Dhuhr"), 
-               ("العصر", "Asr"), ("المغرب", "Maghrib"), ("العشاء", "Isha")]
-    times = {k: "00:00" for _, k in prayers}
-    
-    try:
-        html = requests.get(url, headers=headers, timeout=10).text
-        for name_ar, key_en in prayers:
-            match = re.search(f'وقت صلاة {name_ar}.*?<td>(\d{{2}}:\d{{2}})</td>', html, re.DOTALL)
-            if not match and name_ar == "الشروق":
-                match = re.search(r'وقت الشروق.*?<td>(\d{{2}}:\d{{2}})</td>', html, re.DOTALL)
-            if match:
-                times[key_en] = format_12h(match.group(1))
-    except Exception as e:
-        print(f"Error fetching exact times: {e}")
-        
-    return gov_ar, greg_date, hijri_date, times
-
-# ---------- Image rendering ----------
 S = 2
 W, H = 900, 1300
 DARK = "#1E3A4C"
@@ -129,7 +110,8 @@ DOODLE = (110, 175, 150, 70)
 
 USE_RAQM = features.check("raqm")
 
-def s(v): return int(v * S)
+def s(v):
+    return int(v * S)
 
 class RTLDraw(ImageDraw.ImageDraw):
     def text(self, xy, text, *args, **kwargs):
@@ -176,7 +158,8 @@ def draw_doodles(size):
             if t % 20 == 0:
                 d.line([(s(x1), s(y)), (s(x2), s(y))], fill=DOODLE, width=s(2))
             prev1, prev2 = (x1, y), (x2, y)
-    dna(42, 280, 800); dna(858, 330, 800)
+    dna(42, 280, 800)
+    dna(858, 330, 800)
     def ecg(y):
         pts = []
         for x0 in range(70, 830, 150):
@@ -235,7 +218,6 @@ def render_prayer_card_bytes(gov_ar, greg_date, hijri_date, timings):
     bio.seek(0)
     return bio
 
-# ---------- Bot ----------
 def build_keyboard():
     buttons = []
     items = list(SYRIA_GOVERNORATES.items())

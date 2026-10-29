@@ -1,27 +1,27 @@
-# ---------- Prayer times ----------
-def format_12h(t24):
-    clean = t24.split(" ")[0].strip()
-    return datetime.strptime(clean, "%H:%M").strftime("%I:%M %p").replace("AM", "ص").replace("PM", "م")
+# -*- coding: utf-8 -*-
+print("BOOT: file started", flush=True)
+import os, io, math, asyncio, sqlite3
+from datetime import datetime
+import requests
+import matplotlib
+from PIL import Image, ImageDraw, ImageFont, features
+import arabic_reshaper
+from bidi.algorithm import get_display
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
-def fetch_prayer_times(gov_key):
-    gov_ar, lat, lon = SYRIA_GOVERNORATES[gov_key]
-    greg_date, hijri_date = "تاريخ غير متاح", ""
-    keys = ["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"]
-    times = {k: "--:--" for k in keys}
-    try:
-        resp = requests.get("https://api.aladhan.com/v1/timings", params={
-            "latitude": lat, "longitude": lon,
-            "method": PRAYER_METHOD,
-            "timezonestring": "Asia/Damascus",
-            "tune": PRAYER_TUNE,
-        }, timeout=10)
-        data = resp.json()["data"]
-        en_day = data["date"]["gregorian"]["weekday"]["en"]
-        greg_date = f"{ARABIC_DAYS.get(en_day, '')} {data['date']['gregorian']['date']} م"
-        h = data["date"]["hijri"]
-        hijri_date = f"{h['day']} {h['month']['ar']} {h['year']} هـ"
-        for k in keys:
-            times[k] = format_12h(data["timings"][k])
-    except Exception as e:
-        print(f"Error fetching times: {e}")
-    return gov_ar, greg_date, hijri_date, times
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_ID = int(os.getenv("ADMIN_ID", "5195140085"))
+DB_PATH = "bot_stats.db"
+LOGO_PATH = "logo.jpg"
+
+CAIRO_FONTS = ["Cairo-Bold.ttf", "Cairo-Regular.ttf"]
+_MPL = os.path.join(matplotlib.get_data_path(), "fonts", "ttf")
+DEJAVU_FONTS = [
+    os.path.join(_MPL, "DejaVuSans-Bold.ttf"),
+    os.path.join(_MPL, "DejaVuSans.ttf"),
+]
+
+SYRIA_GOVERNORATES = {
+    "Damascus": ("دمشق", 33.5138, 36.2765),
+    "Rif_Dimashq": ("ريف دمشق", 33.5167, 36.4000),

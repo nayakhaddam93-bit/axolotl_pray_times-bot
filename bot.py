@@ -9,7 +9,7 @@ from bidi.algorithm import get_display
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
+BOT_TOKEN = "8903468673:AAHGDMlLu2Ma-u2K4Of2bCKU34fG0RvHKv8"
 ADMIN_ID = int(os.getenv("ADMIN_ID", "5195140085"))
 DB_PATH = "bot_stats.db"
 LOGO_PATH = "logo.jpg"

@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+print("BOOT: file started", flush=True)
 import os, io, math, asyncio, sqlite3
 from datetime import datetime
 import requests
@@ -9,7 +10,7 @@ from bidi.algorithm import get_display
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
-BOT_TOKEN = "8903468673:AAHGDMlLu2Ma-u2K4Of2bCKU34fG0RvHKv8"
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "5195140085"))
 DB_PATH = "bot_stats.db"
 LOGO_PATH = "logo.jpg"
@@ -38,18 +39,23 @@ SYRIA_GOVERNORATES = {
     "Quneitra": ("القنيطرة", 33.1259, 35.8246),
 }
 
-ARABIC_DAYS = {
-    "Saturday": "السبت", "Sunday": "الأحد", "Monday": "الإثنين",
-    "Tuesday": "الثلاثاء", "Wednesday": "الأربعاء", "Thursday": "الخميس", "Friday": "الجمعة"
-}
+ARABIC_DAYS = {"Saturday": "السبت", "Sunday": "الأحد", "Monday": "الإثنين", "Tuesday": "الثلاثاء",
+               "Wednesday": "الأربعاء", "Thursday": "الخميس", "Friday": "الجمعة"}
 
+# ---------- إعدادات حساب المواقيت ----------
+# method=3 -> رابطة العالم الإسلامي (فجر 18° / عشاء 17°)
+PRAYER_METHOD = 3
+# تعديل بالدقائق: Imsak,Fajr,Sunrise,Dhuhr,Asr,Maghrib,Sunset,Isha,Midnight
+# مثال: لزيادة دقيقة على الفجر اكتب "0,1,0,0,0,0,0,0,0"
+PRAYER_TUNE = "0,0,0,0,0,0,0,0,0"
+
+# ---------- DB ----------
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, username TEXT, full_name TEXT, joined_at TEXT)")
     c.execute("CREATE TABLE IF NOT EXISTS chats (chat_id INTEGER PRIMARY KEY, chat_title TEXT, chat_type TEXT, joined_at TEXT)")
-    conn.commit()
-    conn.close()
+    conn.commit(); conn.close()
 
 def register_interaction(update: Update):
     conn = sqlite3.connect(DB_PATH)
@@ -61,45 +67,45 @@ def register_interaction(update: Update):
     chat = update.effective_chat
     if chat and chat.type in ("group", "supergroup"):
         c.execute("INSERT OR IGNORE INTO chats VALUES (?, ?, ?, ?)", (chat.id, chat.title or "", chat.type, now_str))
-    conn.commit()
-    conn.close()
+    conn.commit(); conn.close()
 
 def get_bot_stats():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("SELECT COUNT(*) FROM users")
-    u = c.fetchone()[0]
-    c.execute("SELECT COUNT(*) FROM chats")
-    ch = c.fetchone()[0]
+    c.execute("SELECT COUNT(*) FROM users"); u = c.fetchone()[0]
+    c.execute("SELECT COUNT(*) FROM chats"); ch = c.fetchone()[0]
     conn.close()
     return u, ch
 
+# ---------- Prayer times ----------
 def format_12h(t24):
     clean = t24.split(" ")[0].strip()
     return datetime.strptime(clean, "%H:%M").strftime("%I:%M %p").replace("AM", "ص").replace("PM", "م")
 
 def fetch_prayer_times(gov_key):
     gov_ar, lat, lon = SYRIA_GOVERNORATES[gov_key]
-    resp = requests.get(
-        "https://api.aladhan.com/v1/timings",
-        params={
-            "latitude": lat,
-            "longitude": lon,
-            "method": 3,
-            "shafaq": "general",
-            "tune": "0,0,-2,2,0,3,0,2,0",
-            "timezonestring": "Asia/Damascus"
-        },
-        timeout=10
-    )
-    data = resp.json()["data"]
-    timings = {k: format_12h(v) for k, v in data["timings"].items()}
-    en_day = data["date"]["gregorian"]["weekday"]["en"]
-    greg_date = f"{ARABIC_DAYS.get(en_day, '')} {data['date']['gregorian']['date']} م"
-    h = data["date"]["hijri"]
-    hijri_date = f"{h['day']} {h['month']['ar']} {h['year']} هـ"
-    return gov_ar, greg_date, hijri_date, timings
+    greg_date, hijri_date = "تاريخ غير متاح", ""
+    keys = ["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"]
+    times = {k: "--:--" for k in keys}
+    try:
+        resp = requests.get("https://api.aladhan.com/v1/timings", params={
+            "latitude": lat, "longitude": lon,
+            "method": PRAYER_METHOD,
+            "timezonestring": "Asia/Damascus",
+            "tune": PRAYER_TUNE,
+        }, timeout=10)
+        data = resp.json()["data"]
+        en_day = data["date"]["gregorian"]["weekday"]["en"]
+        greg_date = f"{ARABIC_DAYS.get(en_day, '')} {data['date']['gregorian']['date']} م"
+        h = data["date"]["hijri"]
+        hijri_date = f"{h['day']} {h['month']['ar']} {h['year']} هـ"
+        for k in keys:
+            times[k] = format_12h(data["timings"][k])
+    except Exception as e:
+        print(f"Error fetching times: {e}")
+    return gov_ar, greg_date, hijri_date, times
 
+# ---------- Image rendering ----------
 S = 2
 W, H = 900, 1300
 DARK = "#1E3A4C"
@@ -110,8 +116,7 @@ DOODLE = (110, 175, 150, 70)
 
 USE_RAQM = features.check("raqm")
 
-def s(v):
-    return int(v * S)
+def s(v): return int(v * S)
 
 class RTLDraw(ImageDraw.ImageDraw):
     def text(self, xy, text, *args, **kwargs):
@@ -158,8 +163,7 @@ def draw_doodles(size):
             if t % 20 == 0:
                 d.line([(s(x1), s(y)), (s(x2), s(y))], fill=DOODLE, width=s(2))
             prev1, prev2 = (x1, y), (x2, y)
-    dna(42, 280, 800)
-    dna(858, 330, 800)
+    dna(42, 280, 800); dna(858, 330, 800)
     def ecg(y):
         pts = []
         for x0 in range(70, 830, 150):
@@ -218,6 +222,7 @@ def render_prayer_card_bytes(gov_ar, greg_date, hijri_date, timings):
     bio.seek(0)
     return bio
 
+# ---------- Bot ----------
 def build_keyboard():
     buttons = []
     items = list(SYRIA_GOVERNORATES.items())
@@ -271,4 +276,9 @@ def main():
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
-    main()
+    import traceback, time
+    try:
+        main()
+    except BaseException:
+        traceback.print_exc()
+        time.sleep(120)
